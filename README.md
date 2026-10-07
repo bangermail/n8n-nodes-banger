@@ -4,6 +4,7 @@ This is an n8n community node for [Banger](https://bangermail.com), company emai
 
 [n8n](https://n8n.io/) is a [fair-code licensed](https://docs.n8n.io/sustainable-use-license/) workflow automation platform.
 
+- [Demo](#demo)
 - [Installation](#installation)
 - [Operations](#operations)
 - [Trigger](#trigger)
@@ -12,6 +13,12 @@ This is an n8n community node for [Banger](https://bangermail.com), company emai
 - [Usage](#usage)
 - [Resources](#resources)
 - [Version history](#version-history)
+
+## Demo
+
+https://github.com/user-attachments/assets/a5ecca98-f29b-4613-9ea3-4e96da728d1d
+
+A 2:45 walkthrough in n8n 2.42.4: install the node from npm, create the Banger credential and pass its test, create a contact and add it to a list, send a Product email, and let an AI Agent look up a contact with the Banger tool.
 
 ## Installation
 
