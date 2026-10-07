@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.1
+
+First release on npm. 0.1.0 was tagged but never published: npm needs `publishConfig.access: public` to attach provenance to a new package.
+
 ## 0.1.0
 
 First release.

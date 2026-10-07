@@ -134,6 +134,6 @@ Prefer to let an AI agent operate Banger? Banger also runs as an MCP server that
 
 ## Version history
 
-### 0.1.0
+### 0.1.1
 
 First release: Email (Send), Contact (Create or Update, Get, Add to List, Remove From List), Journey (Send Email, Enroll Contact, Get Many), Workspace (Get) and Banger Trigger.
