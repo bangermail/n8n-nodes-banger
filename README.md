@@ -39,9 +39,10 @@ Follow the [installation guide](https://docs.n8n.io/integrations/community-nodes
 
 **Journey**
 
-- **Send Email**: send the email of an API Journey to one recipient. For a Journey whose content Banger manages, pass the variables it uses. For a Journey whose content comes from your code, set Subject, HTML or Text, and Reply To under **Additional Fields** instead. Your Journeys page shows each API Journey's key.
+- **Send Email**: send the email of an API Journey to one recipient. For a Journey whose content Banger manages, pass the variables it uses. For a Journey whose content comes from your code, set Subject and HTML or Text under **Additional Fields** instead. Replies go to the Journey's mailbox unless you set Reply To. Your Journeys page shows each API Journey's key.
 - **Enroll Contact**: start a Journey for a contact. Depending on your workspace's review settings, Banger may hold the enrollment in Approvals until a person decides. The output includes the approval and its status.
 - **Get Many**: list Journeys, filtered by status, trigger or name.
+- **Send Event**: send an event, such as `signup` or `trial_started`, for a person. Active Journeys whose trigger listens for it start for that person; Journeys whose goal is that event stop. Those Journeys send email. Add attributes the Journey can read, and an event ID if your system has one: Banger handles each ID once.
 
 **Workspace**
 
@@ -67,8 +68,37 @@ Events you can subscribe to:
 | Rule Activity (`automation.changed`) | Banger publishes an update to its automation rules |
 | Domain Activity (`domain.changed`) | A sending domain changes |
 | Sender Reputation Warning, Sending Lane Paused, Sending Domain Paused, Mailbox Sending Paused, Workspace Sending Frozen, Sending Resumed | Changes to your sender reputation and sending state |
+| Email Received (`mail.received`) | A new email arrived in a mailbox |
+| Email Sent From a Mailbox (`mail.sent`) | A mailbox sent an email |
+| Email Delivered (`send.delivered`) | The receiving server accepted a Product, Broadcast or Journey email (one event per recipient) |
+| Email Bounced (`send.bounced`) | A Product, Broadcast or Journey email bounced |
+| Spam Complaint (`send.complained`) | A recipient marked an email as spam |
+| Journey: Person Entered, Finished, Left (`journey.enrolled`, `journey.completed`, `journey.exited`) | A person started, finished or left a Journey |
 
-Each event is a short notice with the IDs involved, for example:
+The specific events (Email and Journey) carry what a workflow acts on: IDs, people's addresses and the subject, never the email body. For example:
+
+```json
+{
+  "id": "7c0c…",
+  "type": "mail.received",
+  "created_at": "2026-10-07T12:00:00.000Z",
+  "workspace_id": "6f1d…",
+  "product_id": "2a7e…",
+  "data": {
+    "mailbox_id": "c1a2…",
+    "mailbox_address": "support@acme.com",
+    "thread_id": "d4e5…",
+    "message_id": "f6a7…",
+    "subject": "Question about order 1492",
+    "received_at": "2026-10-07T11:59:58.000Z",
+    "from": { "email": "nathan@example.com", "name": "Nathan" },
+    "in_reply_to_send_id": null
+  },
+  "delivery_id": "9e3b…"
+}
+```
+
+The activity events are a short notice with the IDs involved, for example:
 
 ```json
 {
@@ -110,6 +140,7 @@ An API key belongs to one workspace and one product. Scopes needed by each opera
 | Journey: Send Email | `mail:send`, plus `campaigns:read` to pick the Journey from a list |
 | Journey: Enroll Contact | `campaigns:send`, plus `campaigns:read` and `contacts:read` to pick from a list or by email |
 | Journey: Get Many | `campaigns:read` |
+| Journey: Send Event | `automation:execute` |
 | Workspace: Get | any scope |
 | Banger Trigger | `automation:read`, `automation:execute` |
 | Product and Mailbox pickers | `mail:read` |
@@ -128,7 +159,9 @@ Tested with n8n 2.42.4.
 
 **Start onboarding.** Banger (Journey: Send Email) with your welcome Journey's key and variables such as `first_name`.
 
-If your workspace has more than one product, set **Product** under **Additional Fields** on Email: Send to the product your API key belongs to.
+**Start a trial Journey.** Your app's webhook, then Banger (Journey: Send Event) with **Event Type** `trial_started` and the customer's email. Every active Journey triggered by `trial_started` starts for them.
+
+An API key made for one product always works in that product, so leave **Product** empty. Set it only with a workspace-wide key in a workspace that has more than one product.
 
 Prefer to let an AI agent operate Banger? Banger also runs as an MCP server that n8n's MCP Client Tool can use. See [Banger in n8n](https://bangermail.com/agents/n8n/).
 
@@ -140,6 +173,16 @@ Prefer to let an AI agent operate Banger? Banger also runs as an MCP server that
 - [Banger](https://bangermail.com)
 
 ## Version history
+
+### 0.2.0
+
+- Journey: Send Event.
+- Banger Trigger: Email Received, Email Sent From a Mailbox, Email Delivered, Email Bounced, Spam Complaint, and Journey Person Entered, Finished and Left events.
+- Banger Trigger: re-activating a workflow replaces the webhook its earlier activation left behind instead of failing on the taken name.
+- Journey: Send Email no longer needs Reply To: replies go to the Journey's mailbox.
+- Email: Send no longer needs Product for an API key made for one product.
+
+Needs the Banger API of October 2026 or later.
 
 ### 0.1.1
 

@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-banger",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Banger is company email your AI runs. Send Product email, manage contacts and lists, run Journeys and react to Banger events in n8n.",
   "license": "MIT",
   "homepage": "https://github.com/bangermail/n8n-nodes-banger#readme",

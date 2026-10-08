@@ -2,14 +2,15 @@ import { createHmac, timingSafeEqual } from 'crypto';
 import type {
 	IDataObject,
 	IHookFunctions,
+	JsonObject,
 	INodeType,
 	INodeTypeDescription,
 	IWebhookFunctions,
 	IWebhookResponseData,
 } from 'n8n-workflow';
-import { NodeConnectionTypes } from 'n8n-workflow';
+import { NodeApiError, NodeConnectionTypes } from 'n8n-workflow';
 
-import { bangerApiRequest, getWorkspaceId } from '../Banger/GenericFunctions';
+import { bangerApiRequest, bangerErrorCode, getWorkspaceId } from '../Banger/GenericFunctions';
 
 // Banger signs each delivery: base64url(HMAC-SHA256(secret, `${timestamp}.${body}`)),
 // sent as `banger-webhook-signature: v1,<signature>`. Retries are signed again
@@ -63,7 +64,7 @@ export class BangerTrigger implements INodeType {
 		properties: [
 			{
 				displayName:
-					'Banger sends a short notice that something changed, with the IDs involved. Add a Banger node after this trigger to read the details.',
+					'Specific events (email received, sent, delivered, bounced or complained about, and people entering or leaving Journeys) carry the IDs, addresses and subject your workflow needs. Activity events are a short notice that something changed; add a Banger node after them to read the details.',
 				name: 'notice',
 				type: 'notice',
 				default: '',
@@ -96,10 +97,46 @@ export class BangerTrigger implements INodeType {
 						description: 'A sending domain changes',
 					},
 					{
+						name: 'Email Bounced',
+						value: 'send.bounced',
+						description: 'A Product, Broadcast or Journey email bounced, with the bounce type',
+					},
+					{
+						name: 'Email Delivered',
+						value: 'send.delivered',
+						description:
+							'The receiving server accepted a Product, Broadcast or Journey email. One event per recipient, so this one is busy.',
+					},
+					{
+						name: 'Email Received',
+						value: 'mail.received',
+						description: 'A new email arrived in a mailbox, with its sender, subject and IDs',
+					},
+					{
+						name: 'Email Sent From a Mailbox',
+						value: 'mail.sent',
+						description: 'A mailbox sent an email, with its recipients, subject and IDs',
+					},
+					{
+						name: 'Journey: Person Entered',
+						value: 'journey.enrolled',
+						description: 'A person started, or started again, a Journey',
+					},
+					{
+						name: 'Journey: Person Finished',
+						value: 'journey.completed',
+						description: 'A person reached the end of a Journey or its goal',
+					},
+					{
+						name: 'Journey: Person Left',
+						value: 'journey.exited',
+						description:
+							'A person left a Journey early, for example by replying or unsubscribing. The reason says why.',
+					},
+					{
 						name: 'Mailbox Activity',
 						value: 'mail.changed',
-						description:
-							'A mailbox, thread, message, draft, or work item changes, including new inbound email',
+						description: 'A mailbox, thread, message, draft, or work item changes',
 					},
 					{
 						name: 'Mailbox Sending Paused',
@@ -141,6 +178,11 @@ export class BangerTrigger implements INodeType {
 						description: 'A sending pause or freeze was released',
 					},
 					{
+						name: 'Spam Complaint',
+						value: 'send.complained',
+						description: 'A recipient marked a Product, Broadcast or Journey email as spam',
+					},
+					{
 						name: 'Workspace Sending Frozen',
 						value: 'sending.workspace_frozen',
 						description: 'Banger froze all sending in the workspace until it reviews it',
@@ -178,17 +220,44 @@ export class BangerTrigger implements INodeType {
 			async create(this: IHookFunctions): Promise<boolean> {
 				const workspaceId = await getWorkspaceId.call(this);
 				const workflowName = this.getWorkflow().name ?? this.getWorkflow().id ?? 'workflow';
-				const response = await bangerApiRequest.call(
-					this,
-					'POST',
-					`/v1/workspaces/${workspaceId}/webhooks`,
-					{
+				const webhookUrl = this.getNodeWebhookUrl('default');
+				const name = `n8n: ${workflowName}`.slice(0, 120);
+				const register = async () =>
+					await bangerApiRequest.call(this, 'POST', `/v1/workspaces/${workspaceId}/webhooks`, {
 						kind: 'outbound',
-						name: `n8n: ${workflowName}`.slice(0, 120),
-						endpoint_url: this.getNodeWebhookUrl('default'),
+						name,
+						endpoint_url: webhookUrl,
 						event_types: this.getNodeParameter('events') as string[],
-					},
-				);
+					});
+				let response: IDataObject;
+				try {
+					response = await register();
+				} catch (error) {
+					// A webhook with this name is left over from an earlier activation of this
+					// workflow when it points at this trigger's URL: replace it. Another webhook
+					// with the name is someone else's, so the error stands.
+					if (bangerErrorCode(error) !== 'webhook_name_taken') {
+						throw new NodeApiError(this.getNode(), error as JsonObject);
+					}
+					const listed = await bangerApiRequest.call(
+						this,
+						'GET',
+						`/v1/workspaces/${workspaceId}/webhooks`,
+					);
+					const stale = ((listed.data as IDataObject[] | undefined) ?? []).find(
+						(webhook) =>
+							webhook.kind === 'outbound' &&
+							webhook.name === name &&
+							webhook.endpoint_url === webhookUrl,
+					);
+					if (!stale) throw new NodeApiError(this.getNode(), error as JsonObject);
+					await bangerApiRequest.call(
+						this,
+						'DELETE',
+						`/v1/workspaces/${workspaceId}/webhooks/${stale.id as string}`,
+					);
+					response = await register();
+				}
 				const webhook = (response.data ?? {}) as IDataObject;
 				if (!webhook.id || !webhook.signing_secret) return false;
 				const staticData = this.getWorkflowStaticData('node');

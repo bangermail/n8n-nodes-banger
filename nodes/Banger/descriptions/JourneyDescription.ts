@@ -29,6 +29,13 @@ export const journeyOperations: INodeProperties[] = [
 				description: 'Send the email of an API Journey to one recipient',
 				action: 'Send a journey email',
 			},
+			{
+				name: 'Send Event',
+				value: 'sendEvent',
+				description:
+					'Send an event, such as signup or trial_started, that starts or ends the Journeys listening for it. Those Journeys send email.',
+				action: 'Send an event to journeys',
+			},
 		],
 		default: 'send',
 	},
@@ -37,6 +44,7 @@ export const journeyOperations: INodeProperties[] = [
 const showForSend = { resource: ['journey'], operation: ['send'] };
 const showForEnroll = { resource: ['journey'], operation: ['enroll'] };
 const showForGetAll = { resource: ['journey'], operation: ['getAll'] };
+const showForSendEvent = { resource: ['journey'], operation: ['sendEvent'] };
 
 export const journeyFields: INodeProperties[] = [
 	// Send Email
@@ -161,7 +169,7 @@ export const journeyFields: INodeProperties[] = [
 				default: '',
 				placeholder: 'e.g. support@acme.com',
 				description:
-					'Address that receives replies. Needed for a Journey whose content comes from your code.',
+					"Address that receives replies. Leave empty to send replies to the Journey's mailbox.",
 			},
 			{
 				displayName: 'Subject',
@@ -222,6 +230,97 @@ export const journeyFields: INodeProperties[] = [
 		description:
 			'Banger enrolls once per key. Leave empty to use a key made from this execution, node and item. Use 16 to 128 characters.',
 		displayOptions: { show: showForEnroll },
+	},
+
+	// Send Event
+	{
+		displayName: 'Event Type',
+		name: 'eventType',
+		type: 'string',
+		required: true,
+		default: '',
+		placeholder: 'e.g. trial_started',
+		description:
+			'The event name Journey triggers and goals listen for. Use letters, digits and the characters _ . : and -.',
+		displayOptions: { show: showForSendEvent },
+	},
+	{
+		displayName: 'Email',
+		name: 'email',
+		type: 'string',
+		placeholder: 'name@email.com',
+		default: '',
+		description: 'The person the event is about. Journeys enroll or stop them.',
+		displayOptions: { show: showForSendEvent },
+	},
+	{
+		displayName: 'Additional Fields',
+		name: 'eventFields',
+		type: 'collection',
+		placeholder: 'Add Field',
+		default: {},
+		displayOptions: { show: showForSendEvent },
+		options: [
+			{
+				displayName: 'Attributes',
+				name: 'attributes',
+				type: 'fixedCollection',
+				typeOptions: { multipleValues: true },
+				default: {},
+				placeholder: 'Add Attribute',
+				description: 'Up to 50 values Journey conditions and emails can read, such as plan or seats',
+				options: [
+					{
+						displayName: 'Attribute',
+						name: 'attribute',
+						values: [
+							{ displayName: 'Name', name: 'name', type: 'string', default: '' },
+							{ displayName: 'Value', name: 'value', type: 'string', default: '' },
+						],
+					},
+				],
+			},
+			{
+				displayName: 'Connection ID',
+				name: 'connectionId',
+				type: 'string',
+				default: '',
+				description:
+					'Send the event as if it came from another incoming webhook of this product, such as your Stripe source, so Journeys built on it react. Leave empty to use Banger API events.',
+			},
+			{
+				displayName: 'Event ID',
+				name: 'eventId',
+				type: 'string',
+				default: '',
+				description:
+					'Your ID for this event. Banger handles each ID once. Leave empty to use an ID made from this execution, node and item.',
+			},
+			{
+				displayName: 'Name',
+				name: 'name',
+				type: 'string',
+				default: '',
+				placeholder: 'e.g. Nathan Smith',
+				description: 'Name of the person the event is about',
+			},
+			{
+				displayName: 'Occurred At',
+				name: 'occurredAt',
+				type: 'dateTime',
+				default: '',
+				description: 'When the event happened. Defaults to when Banger receives it.',
+			},
+			{
+				displayName: 'Product Name or ID',
+				name: 'productId',
+				type: 'options',
+				typeOptions: { loadOptionsMethod: 'getProducts' },
+				default: '',
+				description:
+					'Leave empty with an API key made for one product. Set it only for a workspace-wide key in a workspace with more than one product. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
+			},
+		],
 	},
 
 	// Get Many

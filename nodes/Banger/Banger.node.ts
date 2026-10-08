@@ -435,6 +435,32 @@ export class Banger implements INodeType {
 						},
 					);
 					result = response.data as IDataObject;
+				} else if (resource === 'journey' && operation === 'sendEvent') {
+					const fields = this.getNodeParameter('eventFields', i) as IDataObject;
+					const email = (this.getNodeParameter('email', i) as string).trim();
+					const body: IDataObject = { type: (this.getNodeParameter('eventType', i) as string).trim() };
+					if (email) body.email = email;
+					if (fields.name) body.name = fields.name;
+					if (fields.occurredAt) body.occurred_at = new Date(fields.occurredAt as string).toISOString();
+					const attributes = nameValuePairs(fields.attributes as IDataObject, 'attribute');
+					if (attributes.length) body.attributes = nameValueObject(attributes);
+					if (fields.connectionId) body.connection_id = (fields.connectionId as string).trim();
+					if ((fields.eventId as string | undefined)?.trim()) body.id = (fields.eventId as string).trim();
+					// Without an event ID, Banger uses the Idempotency-Key as one, so a retry of
+					// this item is the same event and never starts a Journey twice.
+					const requestHeaders: IDataObject = {
+						'Idempotency-Key': idempotencyKey.call(this, 'journey-event', i),
+					};
+					if (fields.productId) requestHeaders['x-banger-product-id'] = fields.productId;
+					const response = await bangerApiRequest.call(
+						this,
+						'POST',
+						`${workspacePath}/events`,
+						body,
+						undefined,
+						requestHeaders,
+					);
+					result = response.data as IDataObject;
 				} else if (resource === 'journey' && operation === 'getAll') {
 					const returnAll = this.getNodeParameter('returnAll', i) as boolean;
 					const filters = this.getNodeParameter('filters', i) as IDataObject;

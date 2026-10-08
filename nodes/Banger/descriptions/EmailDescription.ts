@@ -150,7 +150,7 @@ export const emailFields: INodeProperties[] = [
 				typeOptions: { loadOptionsMethod: 'getProducts' },
 				default: '',
 				description:
-					'Needed when your workspace has more than one product. Choose the product your API key belongs to. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
+					'Leave empty with an API key made for one product: Banger sends as that product. Set it only for a workspace-wide key in a workspace with more than one product. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 			},
 			{
 				displayName: 'Tags',

@@ -22,23 +22,23 @@ interface BangerErrorBody {
 // Banger answers with {"error":{"code","message"}} on /v1 routes and with the
 // Resend shape {"name","message"} on /emails. Surface the code and message
 // either way so the n8n error panel says what Banger said.
-function describeBangerError(error: JsonObject): { message?: string; description?: string } {
+function bangerErrorBody(error: JsonObject): BangerErrorBody | undefined {
 	const response = error.response as IDataObject | undefined;
 	const context = error.context as IDataObject | undefined;
 	const body = (context?.data ?? response?.data ?? response?.body ?? error.error) as
 		| BangerErrorBody
 		| string
 		| undefined;
-	const parsed: BangerErrorBody | undefined =
-		typeof body === 'string'
-			? (() => {
-					try {
-						return JSON.parse(body) as BangerErrorBody;
-					} catch {
-						return undefined;
-					}
-				})()
-			: body;
+	if (typeof body !== 'string') return body;
+	try {
+		return JSON.parse(body) as BangerErrorBody;
+	} catch {
+		return undefined;
+	}
+}
+
+function describeBangerError(error: JsonObject): { message?: string; description?: string } {
+	const parsed = bangerErrorBody(error);
 	const code = parsed?.error?.code ?? parsed?.name;
 	const message = parsed?.error?.message ?? parsed?.message;
 	const hint = code ? ERROR_HINTS[code] : undefined;
@@ -62,14 +62,28 @@ const ERROR_HINTS: Record<string, { message: string; description: string }> = {
 	},
 	product_required: {
 		message: 'This workspace has more than one product',
-		description: "Set 'Product' under 'Additional Fields' to the product your API key belongs to.",
+		description:
+			"Use an API key made for one product, or set 'Product' under 'Additional Fields'.",
 	},
 	api_key_product_mismatch: {
 		message: 'This API key belongs to another product',
+		description: "Leave 'Product' empty: a product's API key always works in its own product.",
+	},
+	webhook_name_taken: {
+		message: 'Another Banger webhook already has this name',
 		description:
-			"Set 'Product' under 'Additional Fields' to the product your API key belongs to, or leave it empty.",
+			"The trigger names its webhook after the workflow. Rename the workflow, or delete the other webhook on Banger's Webhooks page.",
+	},
+	product_reply_to_required: {
+		message: 'Product email needs exactly one Reply To address',
+		description: "Set 'Reply To' to the one address that should receive replies.",
 	},
 };
+
+/** Banger's error code for a failed request, such as webhook_name_taken. */
+export function bangerErrorCode(error: unknown): string | undefined {
+	return (error as { bangerCode?: string } | undefined)?.bangerCode;
+}
 
 export async function bangerApiRequest(
 	this: BangerContext,
@@ -98,11 +112,14 @@ export async function bangerApiRequest(
 		// n8n's request helper already throws a NodeApiError, and wrapping one
 		// returns it unchanged, so put Banger's own words on it directly.
 		const details = describeBangerError(error as JsonObject);
+		const parsed = bangerErrorBody(error as JsonObject);
 		if (error instanceof NodeApiError) {
 			if (details.message) error.message = details.message;
 			if (details.description) error.description = details.description;
 		}
-		throw new NodeApiError(this.getNode(), error as JsonObject, details);
+		const apiError = new NodeApiError(this.getNode(), error as JsonObject, details);
+		Object.assign(apiError, { bangerCode: parsed?.error?.code ?? parsed?.name });
+		throw apiError;
 	}
 }
 
